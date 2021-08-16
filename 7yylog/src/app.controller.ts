@@ -4,9 +4,7 @@ import { AppService } from './app.service';
 
 @Controller('pokemon')
 export class AppController {
-  constructor(
-      private readonly appService: AppService,
-  ) {}
+  constructor(private readonly appService: AppService) {}
 
   @Post('create')
   async createIndexAndInsert(@Body() documents: any[]) {

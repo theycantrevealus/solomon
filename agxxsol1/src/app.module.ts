@@ -1,16 +1,20 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { Transport, ClientsModule } from '@nestjs/microservices';
+import { InventoryController } from './inventory/inventory.controller';
+import { InventoryModule } from './inventory/inventory.module';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+
 @Module({
   imports: [
+    InventoryModule,
     ClientsModule.register([
       {
-        name: 'HELLO_SERVICE',
+        name: 'INVENTORY_GATEWAY',
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://guest:guest@localhost:5672/'],
-          queue: 'solomon-log',
+          urls: [process.env.AMQP_CONNECTION],
+          queue: 'solomon_inventory_item',
           queueOptions: {
             durable: false,
           },
@@ -18,7 +22,7 @@ import { Transport, ClientsModule } from '@nestjs/microservices';
       },
     ]),
   ],
-  controllers: [AppController],
+  controllers: [AppController, InventoryController],
   providers: [AppService],
 })
 export class AppModule {}
