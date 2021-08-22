@@ -1,11 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { EventPattern } from '@nestjs/microservices';
-import {
-  createConnection,
-  ConnectionOptions,
-  getConnectionManager,
-  getManager,
-} from 'typeorm';
+import { getManager } from 'typeorm';
 import { LogActivityService } from './log-activity.service';
 import { LogActivity } from '../model/log.activity';
 import { LogActivityDTO } from './log-activity.dto';
