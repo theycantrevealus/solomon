@@ -1,6 +1,11 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { AppService } from './app.service';
-import { EventPattern, MessagePattern } from '@nestjs/microservices';
+import {
+  Ctx,
+  EventPattern,
+  MessagePattern,
+  RmqContext,
+} from '@nestjs/microservices';
 
 @Controller()
 export class AppController {
@@ -13,7 +18,10 @@ export class AppController {
   }
 
   @MessagePattern('get_inventory')
-  async getMessageInventori(data: string) {
-    return 'Hello Inventori';
+  async getMessageInventori(data: string, @Ctx() context: RmqContext) {
+    const channel = context.getChannelRef();
+    const originalMessage = context.getMessage();
+    console.log(originalMessage);
+    return originalMessage;
   }
 }
