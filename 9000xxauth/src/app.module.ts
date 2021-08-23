@@ -8,7 +8,7 @@ env.config();
 @Module({
   imports: [
     JwtModule.register({
-      secret: 'taknakal',
+      secret: `${process.env.JWT_SECRET}`,
     }),
     RabbitMQModule.forRoot(RabbitMQModule, {
       exchanges: [

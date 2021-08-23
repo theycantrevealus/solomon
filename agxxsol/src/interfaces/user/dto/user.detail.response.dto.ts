@@ -22,5 +22,5 @@ export class DetailUserResponseDto {
     user: IUser;
   };
   @ApiProperty({ example: null, nullable: true })
-  errors: { [key: string]: any };
+  error: { [key: string]: any };
 }

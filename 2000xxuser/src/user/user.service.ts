@@ -26,9 +26,34 @@ export class UserService {
       .getOne();
   }
   async user_detail(uid: string) {
-    return await this.repo.findOne(uid);
+    return await this.repo.findOne({ where: { uid: uid } });
+  }
+  public async getAll(): Promise<UserDTO[]> {
+    return getConnection()
+      .getRepository(UserModel)
+      .createQueryBuilder('user')
+      .where('deleted_at IS NULL')
+      .orderBy('created_at', 'DESC')
+      .getMany();
   }
 
+  public async getPaging(data: any): Promise<UserDTO[]> {
+    return getConnection()
+      .getRepository(UserModel)
+      .createQueryBuilder('user')
+      .where('deleted_at IS NULL')
+      .orderBy('created_at', 'DESC')
+      .andWhere(
+        `first_name ILIKE '%${data.search}%' OR last_name ILIKE '%${data.search}%' OR email ILIKE '%${data.search}%'`,
+      )
+      .skip(data.start)
+      .take(data.length)
+      .getMany();
+    /*return await this.repo
+      .find()
+      .then((items) => items.map((e) => UserDTO.createModel(e)));*/
+  }
+  //================================================================================================================================= RMQ TRANSACTION
   @RabbitRPC({
     exchange: `${process.env.USER_EXCHANGE_NAME}`,
     routingKey: `${process.env.USER_ROUTING_KEY_DETAIL}`,
@@ -36,13 +61,31 @@ export class UserService {
     errorHandler: ackErrorHandler,
   })
   async get_user_detail(data: any) {
-    const result = await this.user_detail(data.uid);
-    return {
-      status: HttpStatus.OK,
-      message: 'user_get_by_id_success',
-      user: result,
-      error: null,
-    };
+    if (data.uid) {
+      const result = await this.user_detail(data.uid);
+      if (result) {
+        return {
+          status: HttpStatus.OK,
+          message: 'user_get_by_id_success',
+          user: result,
+          error: null,
+        };
+      } else {
+        return {
+          status: HttpStatus.NOT_FOUND,
+          message: 'user_get_by_id_not_found',
+          user: {},
+          error: `User not found. Please make sure the uid is correct. uid : ${data.uid}`,
+        };
+      }
+    } else {
+      return {
+        status: HttpStatus.NOT_FOUND,
+        message: 'user_get_by_id_not_found',
+        user: {},
+        error: `User not found. Please make sure the uid is correct. uid : ${data.uid}`,
+      };
+    }
   }
 
   @RabbitRPC({
@@ -64,7 +107,7 @@ export class UserService {
 
       const createdResult = await this.repo.save(UserDTO.createModel(userDTO));
       return {
-        status: HttpStatus.CREATED,
+        status: HttpStatus.OK,
         message: 'user_create_success',
         user: createdResult,
         error: null,
@@ -86,24 +129,34 @@ export class UserService {
     errorHandler: ackErrorHandler,
   })
   async user_edit(userDTO: UserDTO) {
-    const saltOrRounds = 10;
-    const password = userDTO.password;
-    userDTO.password = await bcrypt.hash(password, saltOrRounds);
-    userDTO.updated_at = new Date().toISOString();
-    const editProcess = await this.repo.update(userDTO.uid, userDTO);
-    const editResult = await this.user_detail(userDTO.uid);
-    if (editProcess) {
-      return {
-        status: HttpStatus.CREATED,
-        message: 'user_update_success',
-        user: editResult,
-        error: null,
-      };
+    const check = await this.user_detail(userDTO.uid);
+    if (check) {
+      const saltOrRounds = 10;
+      const password = userDTO.password;
+      userDTO.password = await bcrypt.hash(password, saltOrRounds);
+      userDTO.updated_at = new Date().toISOString();
+      const editProcess = await this.repo.update(userDTO.uid, userDTO);
+      const editResult = await this.user_detail(userDTO.uid);
+      if (editProcess) {
+        return {
+          status: HttpStatus.OK,
+          message: 'user_update_success',
+          user: check,
+          error: null,
+        };
+      } else {
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'user_update_failed',
+          user: editResult,
+          error: null,
+        };
+      }
     } else {
       return {
-        status: HttpStatus.BAD_REQUEST,
-        message: 'user_update_failed',
-        user: editResult,
+        status: HttpStatus.NOT_FOUND,
+        message: 'user_not_found',
+        user: {},
         error: null,
       };
     }

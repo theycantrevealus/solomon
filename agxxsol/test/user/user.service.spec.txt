@@ -1,0 +1,36 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { UserService } from '../src/user/user.service';
+import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
+import env = require('dotenv');
+env.config();
+
+describe('UserService', () => {
+  let service: UserService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      imports: [
+        RabbitMQModule.forRoot(RabbitMQModule, {
+          exchanges: [
+            {
+              name: `${process.env.USER_EXCHANGE_NAME}`,
+              type: `${process.env.USER_EXCHANGE_TYPE}`,
+            },
+            {
+              name: `${process.env.AUTH_EXCHANGE_NAME}`,
+              type: `${process.env.AUTH_EXCHANGE_TYPE}`,
+            },
+          ],
+          uri: `${process.env.AMQP_CONNECTION}`,
+        }),
+      ],
+      providers: [UserService],
+    }).compile();
+
+    service = module.get<UserService>(UserService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});

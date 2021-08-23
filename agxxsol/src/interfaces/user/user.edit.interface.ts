@@ -1,8 +1,6 @@
-import { IUser } from './user.interface';
-
 export interface IServiceUserEditResponse {
   status: number;
   message: string;
-  user: IUser | null;
+  user: any | null;
   errors: { [key: string]: any };
 }

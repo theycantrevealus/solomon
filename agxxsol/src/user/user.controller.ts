@@ -8,8 +8,15 @@ import {
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { v4 as uuid } from 'uuid';
 
@@ -28,45 +35,66 @@ import { LoginUserDto } from '../interfaces/user/dto/user.login.dto';
 import { DetailUserResponseDto } from '../interfaces/user/dto/user.detail.response.dto';
 import { IServiceUserDetailResponse } from '../interfaces/user/user.detail.interface';
 import { DetailUserDto } from '../interfaces/user/dto/user.detail.dto';
+import { JwtAuthGuard } from '../guards/jwt.guard';
+import { Authorization } from '../decorators/auth.decorator';
 
 @Controller('user')
 @ApiTags('user')
 export class UserController {
-  constructor(
-    private readonly amqpConnection: AmqpConnection,
-    private readonly userService: UserService,
-  ) {}
-
+  constructor(private readonly amqpConnection: AmqpConnection) {}
+  //===================================================================================================================
   @Get()
   public async getAll() {
     //return await this.service.getAll();
   }
-
+  //===================================================================================================================
   @Get(':uid')
   @ApiCreatedResponse({
     type: DetailUserResponseDto,
   })
-  public async getByUID(@Param('uid') uid: DetailUserDto) {
+  @ApiOperation({ summary: 'Get user identified by uid' })
+  @ApiResponse({
+    status: 200,
+    description: 'User found',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Authorization(true)
+  @ApiBearerAuth('JWT')
+  public async getByUID(@Param('uid') uid) {
     const detailUserResponse: IServiceUserDetailResponse =
       await this.amqpConnection.request<IServiceUserDetailResponse>({
         exchange: `${process.env.USER_EXCHANGE_NAME}`,
         routingKey: `${process.env.USER_ROUTING_KEY_DETAIL}`,
-        payload: uid,
+        payload: { uid: uid },
       });
-    return {
-      message: detailUserResponse.message,
-      data: {
-        user: detailUserResponse.user,
-      },
-      errors: null,
-    };
+    if (detailUserResponse.status === HttpStatus.OK) {
+      return {
+        message: detailUserResponse.message,
+        data: {
+          user: detailUserResponse.user,
+        },
+        errors: null,
+      };
+    } else {
+      throw new HttpException(
+        {
+          message: detailUserResponse.message,
+          errors: detailUserResponse.error,
+        },
+        detailUserResponse.status,
+      );
+    }
   }
-
+  //===================================================================================================================
   @Post('paging')
   async getPaging(@Body() data) {
     //return this.service.getPaging(data);
   }
-
+  //===================================================================================================================
   @Post('login')
   @ApiCreatedResponse({
     type: LoginUserResponseDto,
@@ -91,7 +119,7 @@ export class UserController {
     const loginTokenResponse: IServiveTokenCreateResponse =
       await this.amqpConnection.request<IServiveTokenCreateResponse>({
         exchange: `${process.env.AUTH_EXCHANGE_NAME}`,
-        routingKey: `${process.env.AUTH_ROUTING_AUTH}`,
+        routingKey: `${process.env.AUTH_ROUTING_KEY_AUTH}`,
         payload: {
           uid: loginUserResponse.user.uid,
         },
@@ -106,11 +134,14 @@ export class UserController {
       errors: null,
     };
   }
-
+  //===================================================================================================================
   @Put('edit')
   @ApiCreatedResponse({
     type: EditUserResponseDto,
   })
+  @UseGuards(JwtAuthGuard)
+  @Authorization(true)
+  @ApiBearerAuth('JWT')
   async editUser(@Body() data: EditUserDto) {
     const editUserResponse: IServiceUserEditResponse =
       await this.amqpConnection.request<IServiceUserEditResponse>({
@@ -118,7 +149,7 @@ export class UserController {
         routingKey: `${process.env.USER_ROUTING_KEY_EDIT}`,
         payload: data,
       });
-    if (editUserResponse.status !== HttpStatus.CREATED) {
+    if (editUserResponse.status !== HttpStatus.OK) {
       throw new HttpException(
         {
           message: editUserResponse.message,
@@ -136,8 +167,11 @@ export class UserController {
       errors: null,
     };
   }
-
+  //===================================================================================================================
   @Post('add')
+  @UseGuards(JwtAuthGuard)
+  @Authorization(true)
+  @ApiBearerAuth('JWT')
   @ApiCreatedResponse({
     type: CreateUserResponseDto,
   })
@@ -166,7 +200,7 @@ export class UserController {
       errors: null,
     };
   }
-
+  //===================================================================================================================
   @Delete(':uid')
   async delete(@Param('uid') uid: string) {
     /*const data = await this.service.getDetail(uid);
