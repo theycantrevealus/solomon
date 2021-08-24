@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UserService } from './user.service';
+import { UserService } from '../../src/user/user.service';
 import 'jest-extended';
 import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
-import { configService } from '../config/orm.config';
-import { UserModel } from '../model/user.model';
+import { configService } from '../../src/config/orm.config';
+import { UserModel } from '../../src/model/user.model';
 import env = require('dotenv');
 import { getConnection, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuid } from 'uuid';
-import { databaseProviders } from '../providers/database.provider';
+import { databaseProviders } from '../../src/providers/database.provider';
 env.config();
 
 describe('[User Service]', () => {

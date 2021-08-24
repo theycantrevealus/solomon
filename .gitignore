@@ -45,3 +45,9 @@ lerna-debug.log*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Tests and Mocks
+**/*.spec.ts
+**/*.mock.ts
+test
+tests

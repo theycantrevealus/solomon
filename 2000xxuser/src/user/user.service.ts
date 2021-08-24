@@ -6,7 +6,24 @@ import env = require('dotenv');
 import { UserDTO } from '../interfaces/dto/user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserModel } from '../model/user.model';
-import { getConnection, Repository } from 'typeorm';
+import { getConnection, IsNull, Not, Repository } from 'typeorm';
+import {
+  userCreateRequestDup,
+  userCreateRequestSuccess,
+} from '../../test/user/mocks/user.add.mocks';
+import {
+  userEditRequestFailed,
+  userEditRequestNotFound,
+  userEditRequestSuccess,
+} from '../../test/user/mocks/user.edit.mock';
+import {
+  userDeleteRequestFailed,
+  userDeleteRequestSuccess,
+} from '../../test/user/mocks/user.delete.mock';
+import {
+  userLoginRequestFailed,
+  userLoginRequestSuccess,
+} from '../../test/user/mocks/user.login.mock';
 env.config();
 
 @Injectable()
@@ -26,18 +43,34 @@ export class UserService {
       .getOne();
   }
   async user_detail(uid: string) {
-    return await this.repo.findOne({ where: { uid: uid } });
+    return await this.repo.findOne({ where: { uid: uid, deleted_at: null } });
   }
-  public async getAll(): Promise<UserDTO[]> {
-    return getConnection()
-      .getRepository(UserModel)
-      .createQueryBuilder('user')
-      .where('deleted_at IS NULL')
-      .orderBy('created_at', 'DESC')
-      .getMany();
+  async user_delete_soft(uid: string) {
+    const deleteResult = await this.repo.softDelete(uid);
+    if (deleteResult) {
+      return userDeleteRequestSuccess;
+    } else {
+      return userDeleteRequestFailed;
+    }
   }
-
-  public async getPaging(data: any): Promise<UserDTO[]> {
+  async user_delete_hard(uid: string) {
+    const deleteResult = await this.repo.delete({ uid: uid });
+    if (deleteResult) {
+      return userDeleteRequestSuccess;
+    } else {
+      return userDeleteRequestFailed;
+    }
+  }
+  async user_all_deleted(): Promise<UserDTO[]> {
+    return await this.repo.find({
+      withDeleted: true,
+      where: { deleted_at: Not(IsNull()) },
+    });
+  }
+  async user_all(): Promise<UserDTO[]> {
+    return await this.repo.find({ deleted_at: null });
+  }
+  async getPaging(data: any): Promise<UserDTO[]> {
     return getConnection()
       .getRepository(UserModel)
       .createQueryBuilder('user')
@@ -102,23 +135,15 @@ export class UserService {
       userDTO.password = await bcrypt.hash(password, saltOrRounds);
 
       userDTO.uid = uuid();
-      userDTO.created_at = new Date().toISOString();
-      userDTO.updated_at = new Date().toISOString();
+      userDTO.created_at = new Date();
+      userDTO.updated_at = new Date();
 
       const createdResult = await this.repo.save(UserDTO.createModel(userDTO));
-      return {
-        status: HttpStatus.OK,
-        message: 'user_create_success',
-        user: createdResult,
-        error: null,
-      };
+      userCreateRequestSuccess.user = userDTO;
+      return userCreateRequestSuccess;
     } else {
-      return {
-        status: HttpStatus.FORBIDDEN,
-        message: 'user_duplicated',
-        user: userDTO,
-        error: null,
-      };
+      userCreateRequestDup.user = userDTO;
+      return userCreateRequestDup;
     }
   }
 
@@ -133,32 +158,22 @@ export class UserService {
     if (check) {
       const saltOrRounds = 10;
       const password = userDTO.password;
-      userDTO.password = await bcrypt.hash(password, saltOrRounds);
-      userDTO.updated_at = new Date().toISOString();
-      const editProcess = await this.repo.update(userDTO.uid, userDTO);
+      check.password = await bcrypt.hash(password, saltOrRounds);
+      check.updated_at = new Date();
+      const editProcess = await this.repo.update(
+        userDTO.uid,
+        UserDTO.createModel(check),
+      );
       const editResult = await this.user_detail(userDTO.uid);
       if (editProcess) {
-        return {
-          status: HttpStatus.OK,
-          message: 'user_update_success',
-          user: check,
-          error: null,
-        };
+        userEditRequestSuccess.user = editResult;
+        return userEditRequestSuccess;
       } else {
-        return {
-          status: HttpStatus.BAD_REQUEST,
-          message: 'user_update_failed',
-          user: editResult,
-          error: null,
-        };
+        userEditRequestFailed.user = editResult;
+        return userEditRequestFailed;
       }
     } else {
-      return {
-        status: HttpStatus.NOT_FOUND,
-        message: 'user_not_found',
-        user: {},
-        error: null,
-      };
+      return userEditRequestNotFound;
     }
   }
 
@@ -173,27 +188,13 @@ export class UserService {
     if (check) {
       const isMatch = await bcrypt.compare(password, check.password);
       if (isMatch) {
-        return {
-          status: HttpStatus.ACCEPTED,
-          message: 'login_success',
-          user: check,
-          error: null,
-        };
+        userLoginRequestSuccess.user = check;
+        return userLoginRequestSuccess;
       } else {
-        return {
-          status: HttpStatus.FORBIDDEN,
-          message: 'login_failed',
-          user: null,
-          error: null,
-        };
+        return userLoginRequestFailed;
       }
     } else {
-      return {
-        status: HttpStatus.FORBIDDEN,
-        message: 'login_failed',
-        user: null,
-        error: null,
-      };
+      return userLoginRequestFailed;
     }
   }
 }

@@ -1,4 +1,12 @@
-import { Entity, Column, PrimaryColumn, Generated } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryColumn,
+  Generated,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+} from 'typeorm';
 import { Exclude } from 'class-transformer';
 
 @Entity({ name: 'user' })
@@ -20,12 +28,12 @@ export class UserModel {
   @Column({ nullable: false, type: 'character varying' })
   password: string;
 
-  @Column({ nullable: false, type: 'timestamp without time zone' })
-  created_at: string;
+  @CreateDateColumn({ nullable: false, type: 'timestamp without time zone' })
+  created_at: Date;
 
-  @Column({ nullable: false, type: 'timestamp without time zone' })
-  updated_at: string;
+  @UpdateDateColumn({ nullable: false, type: 'timestamp without time zone' })
+  updated_at: Date;
 
-  @Column({ nullable: true, type: 'timestamp without time zone' })
-  deleted_at: string;
+  @DeleteDateColumn({ nullable: true, type: 'timestamp without time zone' })
+  deleted_at: Date;
 }

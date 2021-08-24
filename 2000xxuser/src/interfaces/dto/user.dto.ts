@@ -19,15 +19,14 @@ export class UserDTO implements Readonly<UserDTO> {
   @IsString()
   password: string;
 
-  @Exclude()
   @IsString()
-  created_at: string;
+  created_at: Date;
 
   @IsString()
-  updated_at: string;
+  updated_at: Date;
 
   @IsString()
-  deleted_at: string;
+  deleted_at: Date;
 
   public static from(dto: Partial<UserDTO>) {
     const it = new UserDTO();
