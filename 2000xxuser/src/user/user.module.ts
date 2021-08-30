@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
+import { AmqpConnection, RabbitMQModule } from '@golevelup/nestjs-rabbitmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { configService } from '../config/orm.config';
 import { UserModel } from '../model/user.model';
@@ -26,4 +26,6 @@ env.config();
   controllers: [UserController],
   exports: [UserService],
 })
-export class UserModule {}
+export class UserModule {
+  constructor(private readonly amqpConnection: AmqpConnection) {}
+}

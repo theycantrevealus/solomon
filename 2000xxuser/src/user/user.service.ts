@@ -1,38 +1,41 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
-import { ackErrorHandler, RabbitRPC } from '@golevelup/nestjs-rabbitmq';
+import { Injectable } from '@nestjs/common';
+import {
+  ackErrorHandler,
+  AmqpConnection,
+  RabbitRPC,
+} from '@golevelup/nestjs-rabbitmq';
 import * as bcrypt from 'bcrypt';
-import { v4 as uuid } from 'uuid';
 import env = require('dotenv');
-import { UserDTO } from '../interfaces/dto/user.dto';
+import { UserDTO, UserLoginDTO } from '../interfaces/dto/user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserModel } from '../model/user.model';
 import { getConnection, IsNull, Not, Repository } from 'typeorm';
 import {
   userCreateRequestDup,
+  userCreateRequestFailed,
   userCreateRequestSuccess,
-} from '../../test/user/mocks/user.add.mocks';
-import {
-  userEditRequestFailed,
-  userEditRequestNotFound,
-  userEditRequestSuccess,
-} from '../../test/user/mocks/user.edit.mock';
-import {
   userDeleteRequestFailed,
   userDeleteRequestSuccess,
-} from '../../test/user/mocks/user.delete.mock';
-import {
   userLoginRequestFailed,
   userLoginRequestSuccess,
-} from '../../test/user/mocks/user.login.mock';
+  userNotFound,
+  userUpdateRequestFailed,
+  userUpdateRequestSuccess,
+} from '../interfaces/dto/user.response.dto';
+import { IServiveTokenCreateResponse } from '../../../agxxsol/src/interfaces/token/token.create.interface';
 env.config();
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(UserModel)
-    private readonly repo: Repository<UserModel>,
+    private readonly userRepo: Repository<UserModel>,
+    private readonly amqpConnection: AmqpConnection,
   ) {}
-  async user_duplicate_check(email: string) {
+
+  //======================================================================SELECT SECTION
+
+  async check_dup(email: string) {
     return await getConnection()
       .getRepository(UserModel)
       .createQueryBuilder('user')
@@ -42,35 +45,54 @@ export class UserService {
       .setParameters({ email: email })
       .getOne();
   }
-  async user_detail(uid: string) {
-    return await this.repo.findOne({ where: { uid: uid, deleted_at: null } });
+
+  @RabbitRPC({
+    exchange: `${process.env.USER_EXCHANGE_NAME}`,
+    routingKey: `${process.env.USER_ROUTING_KEY_DETAIL}`,
+    queue: 'user_service_get_detail',
+    errorHandler: ackErrorHandler,
+  })
+  async detail(uid: string) {
+    return await this.userRepo.findOne({
+      where: { uid: uid, deleted_at: null },
+    });
   }
-  async user_delete_soft(uid: string) {
-    const deleteResult = await this.repo.softDelete(uid);
-    if (deleteResult) {
-      return userDeleteRequestSuccess;
-    } else {
-      return userDeleteRequestFailed;
-    }
+
+  @RabbitRPC({
+    exchange: `${process.env.USER_EXCHANGE_NAME}`,
+    routingKey: `${process.env.USER_ROUTING_KEY_GET_ACTIVE}`,
+    queue: 'user_service_get_active',
+    errorHandler: ackErrorHandler,
+  })
+  async get_active(): Promise<UserDTO[]> {
+    return await this.userRepo.find({ deleted_at: null });
   }
-  async user_delete_hard(uid: string) {
-    const deleteResult = await this.repo.delete({ uid: uid });
-    if (deleteResult) {
-      return userDeleteRequestSuccess;
-    } else {
-      return userDeleteRequestFailed;
-    }
-  }
-  async user_all_deleted(): Promise<UserDTO[]> {
-    return await this.repo.find({
+
+  @RabbitRPC({
+    exchange: `${process.env.USER_EXCHANGE_NAME}`,
+    routingKey: `${process.env.USER_ROUTING_KEY_GET_DELETED}`,
+    queue: 'user_service_get_deleted',
+    errorHandler: ackErrorHandler,
+  })
+  async get_deleted(): Promise<UserDTO[]> {
+    return await this.userRepo.find({
       withDeleted: true,
       where: { deleted_at: Not(IsNull()) },
     });
   }
-  async user_all(): Promise<UserDTO[]> {
-    return await this.repo.find({ deleted_at: null });
+  @RabbitRPC({
+    exchange: `${process.env.USER_EXCHANGE_NAME}`,
+    routingKey: `${process.env.USER_ROUTING_KEY_GET_ALL}`,
+    queue: 'user_service_get_all',
+    errorHandler: ackErrorHandler,
+  })
+  async get_all(): Promise<UserDTO[]> {
+    return await this.userRepo.find({
+      withDeleted: true,
+    });
   }
-  async getPaging(data: any): Promise<UserDTO[]> {
+
+  async get_paging(data: any): Promise<UserDTO[]> {
     return getConnection()
       .getRepository(UserModel)
       .createQueryBuilder('user')
@@ -82,44 +104,29 @@ export class UserService {
       .skip(data.start)
       .take(data.length)
       .getMany();
-    /*return await this.repo
-      .find()
-      .then((items) => items.map((e) => UserDTO.createModel(e)));*/
   }
-  //================================================================================================================================= RMQ TRANSACTION
-  @RabbitRPC({
-    exchange: `${process.env.USER_EXCHANGE_NAME}`,
-    routingKey: `${process.env.USER_ROUTING_KEY_DETAIL}`,
-    queue: 'user_service_detail',
-    errorHandler: ackErrorHandler,
-  })
-  async get_user_detail(data: any) {
-    if (data.uid) {
-      const result = await this.user_detail(data.uid);
-      if (result) {
-        return {
-          status: HttpStatus.OK,
-          message: 'user_get_by_id_success',
-          user: result,
-          error: null,
-        };
-      } else {
-        return {
-          status: HttpStatus.NOT_FOUND,
-          message: 'user_get_by_id_not_found',
-          user: {},
-          error: `User not found. Please make sure the uid is correct. uid : ${data.uid}`,
-        };
-      }
+
+  //======================================================================DELETE SECTION
+
+  async delete_soft(uid: string) {
+    const deleteResult = await this.userRepo.softDelete(uid);
+    if (deleteResult) {
+      return userDeleteRequestSuccess;
     } else {
-      return {
-        status: HttpStatus.NOT_FOUND,
-        message: 'user_get_by_id_not_found',
-        user: {},
-        error: `User not found. Please make sure the uid is correct. uid : ${data.uid}`,
-      };
+      return userDeleteRequestFailed;
     }
   }
+
+  async delete_hard(uid: string) {
+    const deleteResult = await this.userRepo.delete({ uid: uid });
+    if (deleteResult) {
+      return userDeleteRequestSuccess;
+    } else {
+      return userDeleteRequestFailed;
+    }
+  }
+
+  //======================================================================INSERT SECTION
 
   @RabbitRPC({
     exchange: `${process.env.USER_EXCHANGE_NAME}`,
@@ -127,22 +134,20 @@ export class UserService {
     queue: 'user_service_add',
     errorHandler: ackErrorHandler,
   })
-  async user_add(userDTO: UserDTO) {
-    const check = await this.user_duplicate_check(userDTO.email);
+  async insert(data: UserDTO) {
+    const check = await this.check_dup(data.email);
     if (!check) {
       const saltOrRounds = 10;
-      const password = userDTO.password;
-      userDTO.password = await bcrypt.hash(password, saltOrRounds);
+      const password = data.password;
+      data.password = await bcrypt.hash(password, saltOrRounds);
 
-      userDTO.uid = uuid();
-      userDTO.created_at = new Date();
-      userDTO.updated_at = new Date();
-
-      const createdResult = await this.repo.save(UserDTO.createModel(userDTO));
-      userCreateRequestSuccess.user = userDTO;
-      return userCreateRequestSuccess;
+      const result = await this.userRepo.save(data);
+      if (result) {
+        return userCreateRequestSuccess;
+      } else {
+        return userCreateRequestFailed;
+      }
     } else {
-      userCreateRequestDup.user = userDTO;
       return userCreateRequestDup;
     }
   }
@@ -153,27 +158,20 @@ export class UserService {
     queue: 'user_service_edit',
     errorHandler: ackErrorHandler,
   })
-  async user_edit(userDTO: UserDTO) {
-    const check = await this.user_detail(userDTO.uid);
+  async update(data: UserDTO) {
+    const check = await this.detail(data.uid);
     if (check) {
       const saltOrRounds = 10;
-      const password = userDTO.password;
-      check.password = await bcrypt.hash(password, saltOrRounds);
-      check.updated_at = new Date();
-      const editProcess = await this.repo.update(
-        userDTO.uid,
-        UserDTO.createModel(check),
-      );
-      const editResult = await this.user_detail(userDTO.uid);
-      if (editProcess) {
-        userEditRequestSuccess.user = editResult;
-        return userEditRequestSuccess;
+      const password = data.password;
+      data.password = await bcrypt.hash(password, saltOrRounds);
+      const result = await this.userRepo.save(data);
+      if (result) {
+        return userUpdateRequestSuccess;
       } else {
-        userEditRequestFailed.user = editResult;
-        return userEditRequestFailed;
+        return userUpdateRequestFailed;
       }
     } else {
-      return userEditRequestNotFound;
+      return userNotFound;
     }
   }
 
@@ -183,10 +181,29 @@ export class UserService {
     queue: 'user_service_login',
     errorHandler: ackErrorHandler,
   })
-  async user_login({ email, password }) {
-    const check = await this.user_duplicate_check(email);
+  async login_rmq(data: UserLoginDTO) {
+    const localLogin = await this.login(data);
+    if (localLogin === userLoginRequestSuccess) {
+      const loginToken =
+        await this.amqpConnection.request<IServiveTokenCreateResponse>({
+          exchange: `${process.env.AUTH_EXCHANGE_NAME}`,
+          routingKey: `${process.env.AUTH_ROUTING_KEY_AUTH}`,
+          payload: {
+            uid: localLogin.user.uid,
+          },
+        });
+
+      localLogin.token = loginToken.token;
+      return localLogin;
+    } else {
+      return userLoginRequestFailed;
+    }
+  }
+
+  async login(data: UserLoginDTO) {
+    const check = await this.check_dup(data.email);
     if (check) {
-      const isMatch = await bcrypt.compare(password, check.password);
+      const isMatch = await bcrypt.compare(data.password, check.password);
       if (isMatch) {
         userLoginRequestSuccess.user = check;
         return userLoginRequestSuccess;

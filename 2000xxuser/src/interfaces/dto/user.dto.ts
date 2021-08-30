@@ -1,7 +1,5 @@
 import { IsString, IsUUID } from 'class-validator';
 import { UserModel } from '../../model/user.model';
-import { IUser } from '../user.interface';
-import { Exclude } from 'class-transformer';
 
 export class UserDTO implements Readonly<UserDTO> {
   @IsUUID()
@@ -53,4 +51,43 @@ export class UserDTO implements Readonly<UserDTO> {
       deleted_at: entity.deleted_at,
     });
   }
+}
+
+export class UserLoginDTO {
+  @IsString()
+  email: string;
+
+  @IsString()
+  password: string;
+}
+
+export class UserUpdateDTO {
+  @IsUUID()
+  uid: string;
+
+  @IsString()
+  email: string;
+
+  @IsString()
+  first_name: string;
+
+  @IsString()
+  last_name: string;
+
+  @IsString()
+  password: string;
+}
+
+export class UserInsertDTO {
+  @IsString()
+  email: string;
+
+  @IsString()
+  first_name: string;
+
+  @IsString()
+  last_name: string;
+
+  @IsString()
+  password: string;
 }
