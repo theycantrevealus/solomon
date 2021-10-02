@@ -89,7 +89,7 @@ export class AppService implements JwtOptionsFactory {
       } catch (e) {
         result = {
           status: HttpStatus.BAD_REQUEST,
-          message: 'token_create_bad_request',
+          message: 'token malformed',
           user: '',
           token: data.token,
         };
@@ -97,7 +97,7 @@ export class AppService implements JwtOptionsFactory {
     } else {
       result = {
         status: HttpStatus.BAD_REQUEST,
-        message: 'token_create_bad_request',
+        message: 'undefined token',
         user: '',
         token: data.token,
       };

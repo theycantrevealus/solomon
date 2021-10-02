@@ -1,7 +1,4 @@
 import { HttpStatus } from '@nestjs/common';
-import { IsString } from 'class-validator';
-import { UserDTO } from './user.dto';
-import { IUser } from '../../../../agxxsol/src/interfaces/user/user.interface';
 
 export const userNotFound = {
   status: HttpStatus.NOT_FOUND,

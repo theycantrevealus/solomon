@@ -28,28 +28,55 @@ class ConfigService {
   }
 
   public getTypeOrmConfig(): TypeOrmModuleOptions {
-    return {
-      type: 'postgres',
-      name: 'default',
+    if (this.isProduction()) {
+      return {
+        type: 'postgres',
+        name: 'default',
 
-      host: this.getValue('POSTGRES_HOST'),
-      port: parseInt(this.getValue('POSTGRES_PORT')),
-      username: this.getValue('POSTGRES_USER'),
-      password: this.getValue('POSTGRES_PASSWORD'),
-      database: this.getValue('POSTGRES_DATABASE'),
+        host: this.getValue('POSTGRES_HOST'),
+        port: parseInt(this.getValue('POSTGRES_PORT')),
+        username: this.getValue('POSTGRES_USER'),
+        password: this.getValue('POSTGRES_PASSWORD'),
+        database: this.getValue('POSTGRES_DATABASE'),
 
-      entities: ['src/model/*{.ts,.js}'],
+        entities: [`model/**/*.model.js`],
 
-      migrationsTableName: 'migration',
+        migrationsTableName: 'migration',
 
-      migrations: ['src/migration/*.ts'],
+        migrations: [`model/**/*.migration.js`],
 
-      cli: {
-        migrationsDir: 'src/migration',
-      },
+        cli: {
+          migrationsDir: `migration`,
+          entitiesDir: `model`,
+        },
 
-      ssl: this.isProduction(),
-    };
+        //ssl: this.isProduction(),
+      };
+    } else {
+      return {
+        type: 'postgres',
+        name: 'default',
+
+        host: this.getValue('POSTGRES_HOST'),
+        port: parseInt(this.getValue('POSTGRES_PORT')),
+        username: this.getValue('POSTGRES_USER'),
+        password: this.getValue('POSTGRES_PASSWORD'),
+        database: this.getValue('POSTGRES_DATABASE'),
+
+        entities: [`src/model/*{.js,.ts}`],
+
+        migrationsTableName: 'migration',
+
+        migrations: [`src/migration/*{.js,.ts}`],
+
+        cli: {
+          migrationsDir: `src/migration`,
+          entitiesDir: `src/model`,
+        },
+
+        //ssl: this.isProduction(),
+      };
+    }
   }
 }
 

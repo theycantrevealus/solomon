@@ -22,7 +22,7 @@ import {
   userUpdateRequestFailed,
   userUpdateRequestSuccess,
 } from '../interfaces/dto/user.response.dto';
-import { IServiveTokenCreateResponse } from '../../../agxxsol/src/interfaces/token/token.create.interface';
+import { tokenRMQResponse } from '../interfaces/token.response.interface';
 env.config();
 
 @Injectable()
@@ -184,17 +184,20 @@ export class UserService {
   async login_rmq(data: UserLoginDTO) {
     const localLogin = await this.login(data);
     if (localLogin === userLoginRequestSuccess) {
-      const loginToken =
-        await this.amqpConnection.request<IServiveTokenCreateResponse>({
-          exchange: `${process.env.AUTH_EXCHANGE_NAME}`,
-          routingKey: `${process.env.AUTH_ROUTING_KEY_AUTH}`,
-          payload: {
-            uid: localLogin.user.uid,
-          },
-        });
+      const loginToken = await this.amqpConnection.request<tokenRMQResponse>({
+        exchange: `${process.env.AUTH_EXCHANGE_NAME}`,
+        routingKey: `${process.env.AUTH_ROUTING_KEY_AUTH}`,
+        payload: {
+          uid: localLogin.user.uid,
+        },
+      });
 
-      localLogin.token = loginToken.token;
-      return localLogin;
+      if (loginToken.token !== '') {
+        localLogin.token = loginToken.token;
+        return localLogin;
+      } else {
+        return userLoginRequestFailed;
+      }
     } else {
       return userLoginRequestFailed;
     }

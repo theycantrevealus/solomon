@@ -8,27 +8,15 @@ import {
   DeleteDateColumn,
 } from 'typeorm';
 
-@Entity({ name: 'user' })
-export class UserModel {
+@Entity({ name: 'user_authority' })
+export class UserAuthorityModel {
   @PrimaryColumn()
   @Generated('uuid')
   @Column({ nullable: false, type: 'uuid', primary: true })
   uid: string;
 
   @Column({ nullable: false, type: 'character varying' })
-  email: string;
-
-  @Column({ nullable: false, type: 'character varying' })
-  first_name: string;
-
-  @Column({ nullable: false, type: 'character varying' })
-  last_name: string;
-
-  @Column({ nullable: true, type: 'uuid' })
-  authority: string;
-
-  @Column({ nullable: false, type: 'character varying' })
-  password: string;
+  name: string;
 
   @CreateDateColumn({ nullable: false, type: 'timestamp without time zone' })
   created_at: Date;

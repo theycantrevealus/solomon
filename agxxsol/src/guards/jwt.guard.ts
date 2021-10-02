@@ -8,7 +8,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { IServiveTokenDecodeResponse } from '../interfaces/token/token.decode.interface';
-import { IServiceUserDetailResponse } from '../interfaces/user/user.detail.interface';
+import { UserDetailResponseDTO } from 'src/interfaces/user/dto/user.response.dto';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -60,8 +60,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         decodeTokenResponse.status,
       );
     }
-    const detailUserResponse: IServiceUserDetailResponse =
-      await this.amqpConnection.request<IServiceUserDetailResponse>({
+    const detailUserResponse: UserDetailResponseDTO =
+      await this.amqpConnection.request<UserDetailResponseDTO>({
         exchange: `${process.env.USER_EXCHANGE_NAME}`,
         routingKey: `${process.env.USER_ROUTING_KEY_DETAIL}`,
         payload: { uid: decodeTokenResponse.user },

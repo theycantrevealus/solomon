@@ -1,42 +1,10 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpException,
-  HttpStatus,
-  Param,
-  Post,
-  Put,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiCreatedResponse,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import { v4 as uuid } from 'uuid';
 
 //DTO
-import { CreateUserDto } from '../interfaces/user/dto/user.create.dto';
-import { CreateUserResponseDto } from '../interfaces/user/dto/user.create.response.dto';
-import { IServiceUserCreateResponse } from '../interfaces/user/user.create.interface';
-import { UserService } from './user.service';
-import { IServiveTokenCreateResponse } from '../interfaces/token/token.create.interface';
-import { EditUserDto } from '../interfaces/user/dto/user.edit.dto';
-import { IServiceUserEditResponse } from '../interfaces/user/user.edit.interface';
-import { EditUserResponseDto } from '../interfaces/user/dto/user.edit.response.dto';
-import { LoginUserResponseDto } from '../interfaces/user/dto/user.login.response.dto';
-import { IServiceUserLoginResponse } from '../interfaces/user/user.login.interface';
-import { LoginUserDto } from '../interfaces/user/dto/user.login.dto';
-import { DetailUserResponseDto } from '../interfaces/user/dto/user.detail.response.dto';
-import { IServiceUserDetailResponse } from '../interfaces/user/user.detail.interface';
-import { DetailUserDto } from '../interfaces/user/dto/user.detail.dto';
-import { JwtAuthGuard } from '../guards/jwt.guard';
-import { Authorization } from '../decorators/auth.decorator';
+import { LoginUserDto } from '../interfaces/user/dto/user.dto';
+import { LoginUserResponseDTO } from '../interfaces/user/dto/user.response.dto';
 
 @Controller('user')
 @ApiTags('user')
@@ -48,7 +16,7 @@ export class UserController {
     //return await this.service.getAll();
   }
   //===================================================================================================================
-  @Get(':uid')
+  /*@Get(':uid')
   @ApiCreatedResponse({
     type: DetailUserResponseDto,
   })
@@ -88,7 +56,7 @@ export class UserController {
         detailUserResponse.status,
       );
     }
-  }
+  }*/
   //===================================================================================================================
   @Post('paging')
   async getPaging(@Body() data) {
@@ -97,45 +65,17 @@ export class UserController {
   //===================================================================================================================
   @Post('login')
   @ApiCreatedResponse({
-    type: LoginUserResponseDto,
+    type: LoginUserResponseDTO,
   })
   async login(@Body() data: LoginUserDto) {
-    const loginUserResponse: IServiceUserLoginResponse =
-      await this.amqpConnection.request<IServiceUserLoginResponse>({
-        exchange: `${process.env.USER_EXCHANGE_NAME}`,
-        routingKey: 'user_login',
-        payload: data,
-      });
-    if (loginUserResponse.status !== HttpStatus.ACCEPTED) {
-      throw new HttpException(
-        {
-          message: loginUserResponse.message,
-          errors: loginUserResponse.errors,
-        },
-        loginUserResponse.status,
-      );
-    }
-
-    const loginTokenResponse: IServiveTokenCreateResponse =
-      await this.amqpConnection.request<IServiveTokenCreateResponse>({
-        exchange: `${process.env.AUTH_EXCHANGE_NAME}`,
-        routingKey: `${process.env.AUTH_ROUTING_KEY_AUTH}`,
-        payload: {
-          uid: loginUserResponse.user.uid,
-        },
-      });
-
-    return {
-      message: loginTokenResponse.message,
-      data: {
-        user: loginUserResponse.user,
-        token: loginTokenResponse.token || 'no-token',
-      },
-      errors: null,
-    };
+    return await this.amqpConnection.request({
+      exchange: `${process.env.USER_EXCHANGE_NAME}`,
+      routingKey: 'user_login',
+      payload: data,
+    });
   }
   //===================================================================================================================
-  @Put('edit')
+  /*@Put('edit')
   @ApiCreatedResponse({
     type: EditUserResponseDto,
   })
@@ -166,9 +106,9 @@ export class UserController {
       },
       errors: null,
     };
-  }
+  }*/
   //===================================================================================================================
-  @Post('add')
+  /*@Post('add')
   @UseGuards(JwtAuthGuard)
   @Authorization(true)
   @ApiBearerAuth('JWT')
@@ -199,7 +139,7 @@ export class UserController {
       },
       errors: null,
     };
-  }
+  }*/
   //===================================================================================================================
   @Delete(':uid')
   async delete(@Param('uid') uid: string) {
